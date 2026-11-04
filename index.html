@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0c1a2b">
+<title>Papa, qu’est-ce que c’est ?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --nuit: #0c1a2b;
+    --ciel: #16304d;
+    --aube: #f2b46d;
+    --brume: #c9d8e8;
+    --blanc: #f7fbff;
+    --alerte: #ff7a6b;
+    color-scheme: dark;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  html { height: 100%; }
+  body {
+    margin: 0; min-height: 100%;
+    background: linear-gradient(180deg, var(--nuit) 0%, var(--ciel) 70%, #3a4f66 100%);
+    color: var(--blanc);
+    font-family: "Bricolage Grotesque", "Avenir Next", "Trebuchet MS", system-ui, sans-serif;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 20px 16px 40px;
+  }
+  main { width: 100%; max-width: 480px; }
+  h1 { font-size: 1.5rem; font-weight: 800; margin: 8px 0 4px; letter-spacing: -0.01em; }
+  .sous { color: var(--brume); margin: 0 0 18px; font-size: 0.95rem; }
+
+  .radar { display: block; width: 100%; max-width: 320px; margin: 0 auto 8px; }
+  .legende-radar { text-align: center; color: var(--brume); font-size: 0.85rem; margin: 0 0 20px; }
+
+  button.gros {
+    width: 100%; border: 0; border-radius: 22px; padding: 22px 16px;
+    background: var(--aube); color: #2a1a05;
+    font: inherit; font-weight: 800; font-size: 1.35rem; cursor: pointer;
+    box-shadow: 0 8px 0 #b97f35;
+    transition: transform .08s, box-shadow .08s;
+  }
+  button.gros:active { transform: translateY(6px); box-shadow: 0 2px 0 #b97f35; }
+  button.gros:focus-visible { outline: 3px solid var(--blanc); outline-offset: 4px; }
+  button.gros[disabled] { opacity: .7; }
+
+  #etat { margin: 22px 0 0; color: var(--brume); text-align: center; min-height: 1.4em; }
+  #etat.erreur { color: var(--alerte); }
+
+  .avion {
+    margin-top: 18px; padding: 18px; border-radius: 18px;
+    background: rgba(247, 251, 255, .08);
+    border: 1px solid rgba(201, 216, 232, .25);
+  }
+  .avion.principal { background: rgba(247, 251, 255, .14); border-color: var(--aube); }
+  .avion h2 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+  .compagnie { margin: 2px 0 0; color: var(--brume); }
+  .trajet {
+    display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center;
+    margin: 16px 0 6px; text-align: center;
+  }
+  .ville { font-weight: 700; font-size: 1.05rem; line-height: 1.2; }
+  .code { display: block; color: var(--aube); font-size: 1.6rem; font-weight: 800; }
+  .fleche { font-size: 1.6rem; color: var(--brume); }
+  .horaires { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; text-align: center; margin-bottom: 12px; }
+  .horaires b { display: block; font-size: 1.25rem; }
+  .horaires span { color: var(--brume); font-size: 0.8rem; }
+  dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.95rem; }
+  dt { color: var(--brume); }
+  dd { margin: 0; text-align: right; font-weight: 600; }
+  .note { margin: 12px 0 0; color: var(--brume); font-size: 0.8rem; }
+  .petit { margin-top: 28px; color: var(--brume); font-size: 0.78rem; text-align: center; }
+  @media (prefers-reduced-motion: no-preference) {
+    .point-avion { animation: pulse 1.6s ease-in-out infinite; }
+    @keyframes pulse { 50% { opacity: .45; } }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Papa, qu’est-ce que c’est ?</h1>
+  <p class="sous">Les avions que tu vois par la fenêtre, en direct.</p>
+
+  <svg class="radar" id="radar" viewBox="-160 -160 320 320" role="img" aria-label="Carte du ciel vu de la fenêtre">
+    <circle r="150" fill="none" stroke="#c9d8e8" stroke-opacity=".25"/>
+    <circle r="100" fill="none" stroke="#c9d8e8" stroke-opacity=".18"/>
+    <circle r="50"  fill="none" stroke="#c9d8e8" stroke-opacity=".12"/>
+    <path id="cone" fill="#f2b46d" fill-opacity=".18" stroke="#f2b46d" stroke-opacity=".6"/>
+    <circle r="5" fill="#f7fbff"/>
+    <g id="points"></g>
+    <text x="0" y="-136" text-anchor="middle" fill="#c9d8e8" font-size="12">N</text>
+    <text x="142" y="4" text-anchor="middle" fill="#c9d8e8" font-size="12">E</text>
+    <text x="0" y="148" text-anchor="middle" fill="#c9d8e8" font-size="12">S</text>
+    <text x="-142" y="4" text-anchor="middle" fill="#c9d8e8" font-size="12">O</text>
+  </svg>
+  <p class="legende-radar">La zone orange, c’est ta fenêtre (sud-ouest).</p>
+
+  <button class="gros" id="go">Qu’est-ce que c’est ?</button>
+  <p id="etat" role="status" aria-live="polite"></p>
+  <div id="resultats"></div>
+
+  <p class="petit">Positions : adsb.lol (ou OpenSky) · Routes et modèles : adsbdb.com.<br>Les heures d’arrivée sont des estimations.</p>
+</main>
+
+<script>
+(function () {
+  // ---- Réglages : ta maison ----
+  var MAISON = { lat: 59.4008, lon: 17.9344 };   // Kista (59°24′3″ N, 17°56′4″ E)
+  var CAP_FENETRE = 229;                         // direction de la fenêtre (sud-ouest)
+  var DEMI_ANGLE = 90;                           // largeur de vue : ±90° (tout ce qui est devant la fenêtre)
+  var PORTEE_KM = 30;                            // distance max
+  var FUSEAU = "Europe/Stockholm";
+
+  var RAYON_TERRE = 6371;
+  function rad(d) { return d * Math.PI / 180; }
+  function deg(r) { return r * 180 / Math.PI; }
+  function distanceKm(a, b) {
+    var dLat = rad(b.lat - a.lat), dLon = rad(b.lon - a.lon);
+    var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * RAYON_TERRE * Math.asin(Math.sqrt(h));
+  }
+  function cap(a, b) {
+    var y = Math.sin(rad(b.lon - a.lon)) * Math.cos(rad(b.lat));
+    var x = Math.cos(rad(a.lat)) * Math.sin(rad(b.lat)) -
+            Math.sin(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.cos(rad(b.lon - a.lon));
+    return (deg(Math.atan2(y, x)) + 360) % 360;
+  }
+  function ecartAngle(a, b) {
+    var d = Math.abs(a - b) % 360;
+    return d > 180 ? 360 - d : d;
+  }
+  function heure(date) {
+    return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: FUSEAU });
+  }
+  function echapper(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  var elEtat = document.getElementById("etat");
+  var elRes = document.getElementById("resultats");
+  var bouton = document.getElementById("go");
+  var elPoints = document.getElementById("points");
+
+  // Dessine la zone de la fenêtre sur le radar
+  (function dessinerCone() {
+    var R = 150;
+    function pt(angle) {
+      var a = rad(angle - 90);
+      return (R * Math.cos(a)).toFixed(1) + "," + (R * Math.sin(a)).toFixed(1);
+    }
+    document.getElementById("cone").setAttribute("d",
+      "M0,0 L" + pt(CAP_FENETRE - DEMI_ANGLE) + " A" + R + "," + R + " 0 0 1 " + pt(CAP_FENETRE + DEMI_ANGLE) + " Z");
+  })();
+
+  function dessinerPoints(avions) {
+    var svg = "";
+    avions.forEach(function (a, i) {
+      var r = Math.min(a.dist / PORTEE_KM, 1) * 150;
+      var ang = rad(a.cap - 90);
+      var x = (r * Math.cos(ang)).toFixed(1), y = (r * Math.sin(ang)).toFixed(1);
+      svg += '<circle class="' + (i === 0 ? "point-avion" : "") + '" cx="' + x + '" cy="' + y +
+             '" r="' + (i === 0 ? 7 : 4) + '" fill="' + (i === 0 ? "#f2b46d" : "#f7fbff") + '"/>';
+    });
+    elPoints.innerHTML = svg;
+  }
+
+  function boite() {
+    var dLat = PORTEE_KM / 111, dLon = PORTEE_KM / (111 * Math.cos(rad(MAISON.lat)));
+    return { lamin: MAISON.lat - dLat, lamax: MAISON.lat + dLat, lomin: MAISON.lon - dLon, lomax: MAISON.lon + dLon };
+  }
+
+  // Source principale : adsb.lol (gratuit, sans clé). Secours : OpenSky.
+  function chercherAvions() {
+    return chercherAvionsAdsbLol().catch(function (e1) {
+      return chercherAvionsOpenSky().catch(function (e2) {
+        throw new Error("adsb.lol : " + e1.message + " / OpenSky : " + e2.message +
+                        " / page ouverte depuis : " + (location.protocol || "?"));
+      });
+    });
+  }
+
+  function chercherAvionsAdsbLol() {
+    var rayonNm = Math.ceil(PORTEE_KM / 1.852);
+    var url = "https://api.adsb.lol/v2/point/" + MAISON.lat + "/" + MAISON.lon + "/" + rayonNm;
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("adsb.lol a répondu " + r.status);
+      return r.json();
+    }).then(function (data) {
+      var liste = [];
+      (data.ac || []).forEach(function (s) {
+        if (s.lat == null || s.lon == null || s.alt_baro === "ground") return;
+        var pos = { lat: s.lat, lon: s.lon };
+        var dist = distanceKm(MAISON, pos);
+        if (dist > PORTEE_KM) return;
+        var c = cap(MAISON, pos);
+        var ecart = ecartAngle(c, CAP_FENETRE);
+        var altPieds = typeof s.alt_baro === "number" ? s.alt_baro : (s.alt_geom || 0);
+        var taux = s.baro_rate != null ? s.baro_rate : (s.geom_rate || 0);
+        liste.push({
+          hex: s.hex, appel: (s.flight || "").trim(), type: s.t || "", pos: pos, dist: dist, cap: c, ecart: ecart,
+          visible: ecart <= DEMI_ANGLE, alt: altPieds * 0.3048,
+          vitesse: s.gs != null ? s.gs * 1.852 : null, montee: taux * 0.00508
+        });
+      });
+      return liste;
+    });
+  }
+
+  function chercherAvionsOpenSky() {
+    var b = boite();
+    var url = "https://opensky-network.org/api/states/all?lamin=" + b.lamin.toFixed(3) +
+              "&lomin=" + b.lomin.toFixed(3) + "&lamax=" + b.lamax.toFixed(3) + "&lomax=" + b.lomax.toFixed(3);
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error("OpenSky a répondu " + r.status);
+      return r.json();
+    }).then(function (data) {
+      var liste = [];
+      (data.states || []).forEach(function (s) {
+        if (s[5] == null || s[6] == null || s[8]) return;      // pas de position, ou au sol
+        var pos = { lat: s[6], lon: s[5] };
+        var dist = distanceKm(MAISON, pos);
+        var c = cap(MAISON, pos);
+        var ecart = ecartAngle(c, CAP_FENETRE);
+        var alt = s[13] != null ? s[13] : s[7];
+        liste.push({
+          hex: s[0], appel: (s[1] || "").trim(), pos: pos, dist: dist, cap: c, ecart: ecart,
+          visible: ecart <= DEMI_ANGLE, alt: alt || 0,
+          vitesse: s[9] != null ? s[9] * 3.6 : null, montee: s[11] || 0
+        });
+      });
+      return liste;
+    });
+  }
+
+  function infosRoute(a) {
+    var routeP = a.appel ? fetch("https://api.adsbdb.com/v0/callsign/" + encodeURIComponent(a.appel))
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }) : Promise.resolve(null);
+    var avionP = fetch("https://api.adsbdb.com/v0/aircraft/" + encodeURIComponent(a.hex))
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    return Promise.all([routeP, avionP]).then(function (res) {
+      a.route = res[0] && res[0].response && res[0].response.flightroute || null;
+      a.modele = res[1] && res[1].response && res[1].response.aircraft || null;
+      return a;
+    });
+  }
+
+  function positionDansLeCiel(a) {
+    var d = ((a.cap - CAP_FENETRE) + 540) % 360 - 180;   // négatif = à gauche
+    if (Math.abs(d) < 12) return "droit devant ta fenêtre";
+    return d < 0 ? "plutôt vers la gauche" : "plutôt vers la droite";
+  }
+  function elevation(a) { return Math.round(deg(Math.atan2(a.alt, a.dist * 1000))); }
+
+  function estimations(a) {
+    var maintenant = new Date();
+    var out = { depart: null, arrivee: null, departNote: "", arriveeNote: "" };
+    if (!a.route) return out;
+    var o = a.route.origin, d = a.route.destination;
+    // Départ : si l'avion monte près de son aéroport de départ, il vient de décoller
+    if (o && o.latitude != null) {
+      var distO = distanceKm(a.pos, { lat: o.latitude, lon: o.longitude });
+      if (a.montee > 1 && distO < 25 && a.alt < 5000) {
+        var vit = Math.max((a.vitesse || 300), 250) / 60;   // km/min
+        var minutes = Math.max(Math.round(distO / vit), 0);
+        out.depart = new Date(maintenant.getTime() - minutes * 60000);
+        out.departNote = "décollé il y a environ " + (minutes < 1 ? "1 min" : minutes + " min");
+      }
+    }
+    // Arrivée : distance restante / vitesse moyenne
+    if (d && d.latitude != null) {
+      var reste = distanceKm(a.pos, { lat: d.latitude, lon: d.longitude });
+      var moy = (a.alt > 7000 && a.vitesse) ? a.vitesse : (reste < 300 ? 550 : 750);
+      var h = reste / moy + (reste > 150 ? 0.25 : 0.1);       // + descente / approche
+      out.arrivee = new Date(maintenant.getTime() + h * 3600000);
+      out.arriveeNote = "reste ~" + Math.round(reste) + " km";
+    }
+    return out;
+  }
+
+  function carte(a, principal) {
+    var r = a.route, m = a.modele;
+    var titre = (r && r.callsign_iata) || a.appel || a.hex.toUpperCase();
+    var compagnie = r && r.airline ? r.airline.name : "";
+    var est = estimations(a);
+    var h = '<article class="avion' + (principal ? ' principal' : '') + '">';
+    h += "<h2>" + echapper(titre) + "</h2>";
+    h += '<p class="compagnie">' + echapper(compagnie || (a.appel ? "Compagnie inconnue" : "Vol non identifié")) +
+         (m ? " · " + echapper([m.manufacturer, m.type].filter(Boolean).join(" ")) : (a.type ? " · " + echapper(a.type) : "")) + "</p>";
+    if (r && r.origin && r.destination) {
+      h += '<div class="trajet"><div class="ville"><span class="code">' + echapper(r.origin.iata_code) + "</span>" +
+           echapper(r.origin.municipality) + '</div><div class="fleche">✈</div><div class="ville"><span class="code">' +
+           echapper(r.destination.iata_code) + "</span>" + echapper(r.destination.municipality) + "</div></div>";
+      h += '<div class="horaires"><div><b>' + (est.depart ? "~" + heure(est.depart) : "–") +
+           "</b><span>décollage</span></div><div><b>" + (est.arrivee ? "~" + heure(est.arrivee) : "–") +
+           "</b><span>arrivée estimée</span></div></div>";
+    } else {
+      h += '<p class="note">Destination introuvable pour ce vol (avion privé, militaire ou hélicoptère, peut‑être).</p>';
+    }
+    h += "<dl>";
+    h += "<dt>Dans le ciel</dt><dd>" + positionDansLeCiel(a) + "</dd>";
+    h += "<dt>Distance</dt><dd>" + a.dist.toFixed(1).replace(".", ",") + " km</dd>";
+    h += "<dt>Altitude</dt><dd>" + Math.round(a.alt) + " m</dd>";
+    h += "<dt>Hauteur dans le ciel</dt><dd>" + elevation(a) + "° au-dessus de l’horizon</dd>";
+    if (a.vitesse != null) h += "<dt>Vitesse</dt><dd>" + Math.round(a.vitesse) + " km/h</dd>";
+    h += "<dt>Il fait quoi ?</dt><dd>" + (a.montee > 1 ? "il monte" : a.montee < -1 ? "il descend" : "il vole en palier") + "</dd>";
+    if (m && m.registration) h += "<dt>Immatriculation</dt><dd>" + echapper(m.registration) + "</dd>";
+    h += "</dl>";
+    if (est.departNote || est.arriveeNote) {
+      h += '<p class="note">' + [est.departNote, est.arriveeNote].filter(Boolean).join(" · ") + ".</p>";
+    }
+    return h + "</article>";
+  }
+
+  function lancer() {
+    bouton.disabled = true;
+    elEtat.className = "";
+    elEtat.textContent = "Je regarde le ciel…";
+    elRes.innerHTML = "";
+    elPoints.innerHTML = "";
+
+    chercherAvions().then(function (tous) {
+      var visibles = tous.filter(function (a) { return a.visible; });
+      dessinerPoints(visibles.concat(tous.filter(function (a) { return !a.visible; })).sort(function (x, y) { return score(x) - score(y); }));
+      if (!visibles.length) {
+        elEtat.textContent = tous.length
+          ? "Aucun avion devant ta fenêtre. " + tous.length + " dans les environs, mais pas de ce côté."
+          : "Aucun avion en vol dans les environs. Réessaie dans un instant.";
+        return null;
+      }
+      visibles.sort(function (x, y) { return score(x) - score(y); });
+      var top = visibles.slice(0, 3);
+      elEtat.textContent = "Je cherche d’où il vient et où il va…";
+      return Promise.all(top.map(infosRoute)).then(function (avions) {
+        elRes.innerHTML = avions.map(function (a, i) { return carte(a, i === 0); }).join("");
+        elEtat.textContent = visibles.length + " avion" + (visibles.length > 1 ? "s" : "") + " devant ta fenêtre, à " + heure(new Date()) + ".";
+      });
+    }).catch(function (e) {
+      elEtat.className = "erreur";
+      elEtat.textContent = "Impossible de joindre le service d’avions (" + e.message + "). Réessaie dans une minute.";
+    }).then(function () { bouton.disabled = false; });
+  }
+
+  function score(a) { return a.dist + a.ecart * 0.15; }
+
+  bouton.addEventListener("click", lancer);
+})();
+</script>
+</body>
+</html>
