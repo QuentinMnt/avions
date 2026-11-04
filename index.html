@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#0c1a2b">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<meta name="referrer" content="no-referrer">
 <title>Papa, qu’est-ce que c’est ?</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&display=swap" rel="stylesheet">
@@ -73,6 +75,20 @@
   dl { margin: 12px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 0.95rem; }
   dt { color: var(--brume); }
   dd { margin: 0; text-align: right; font-weight: 600; }
+  .photo { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 12px; margin: 0 0 14px; background: rgba(247,251,255,.08); }
+  .credit { margin: -8px 0 12px; font-size: 0.7rem; color: var(--brume); text-align: right; }
+  #reglages { margin: 0 0 20px; padding: 18px; border-radius: 18px; background: rgba(247,251,255,.1); border: 1px solid var(--aube); }
+  #reglages[hidden] { display: none; }
+  #reglages h2 { margin: 0 0 6px; font-size: 1.15rem; }
+  #reglages p { margin: 0 0 12px; color: var(--brume); font-size: 0.88rem; }
+  #reglages label { display: block; margin: 10px 0 4px; font-size: 0.85rem; color: var(--brume); }
+  #reglages input { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid rgba(201,216,232,.4); background: rgba(12,26,43,.7); color: var(--blanc); font: inherit; font-size: 1rem; }
+  #reglages input:focus-visible { outline: 3px solid var(--aube); outline-offset: 2px; }
+  .rangee { display: flex; gap: 10px; margin-top: 14px; }
+  .rangee button { flex: 1; padding: 12px; border-radius: 12px; border: 0; font: inherit; font-weight: 700; cursor: pointer; }
+  .rangee .sec { background: rgba(247,251,255,.15); color: var(--blanc); }
+  .rangee .pri { background: var(--aube); color: #2a1a05; }
+  .lien { background: none; border: 0; color: var(--brume); text-decoration: underline; font: inherit; font-size: 0.8rem; cursor: pointer; margin-top: 8px; }
   .note { margin: 12px 0 0; color: var(--brume); font-size: 0.8rem; }
   .petit { margin-top: 28px; color: var(--brume); font-size: 0.78rem; text-align: center; }
   @media (prefers-reduced-motion: no-preference) {
@@ -85,6 +101,22 @@
 <main>
   <h1>Papa, qu’est-ce que c’est ?</h1>
   <p class="sous">Les avions que tu vois par la fenêtre, en direct.</p>
+
+  <section id="reglages" hidden>
+    <h2>Réglages (une seule fois)</h2>
+    <p>Ces informations restent uniquement sur ce téléphone. Elles ne sont envoyées nulle part, sauf la zone de recherche d’avions.</p>
+    <label for="r-lat">Latitude</label>
+    <input id="r-lat" inputmode="decimal" autocomplete="off" placeholder="ex. 59.1234">
+    <label for="r-lon">Longitude</label>
+    <input id="r-lon" inputmode="decimal" autocomplete="off" placeholder="ex. 17.1234">
+    <label for="r-cap">Direction de la fenêtre, en degrés (0 = nord, 90 = est, 180 = sud, 270 = ouest)</label>
+    <input id="r-cap" inputmode="numeric" autocomplete="off" placeholder="ex. 229">
+    <div class="rangee">
+      <button type="button" class="sec" id="r-pos">Utiliser ma position</button>
+      <button type="button" class="pri" id="r-ok">Enregistrer</button>
+    </div>
+    <p id="r-msg" style="margin:10px 0 0"></p>
+  </section>
 
   <svg class="radar" id="radar" viewBox="-160 -160 320 320" role="img" aria-label="Carte du ciel vu de la fenêtre">
     <circle r="150" fill="none" stroke="#c9d8e8" stroke-opacity=".25"/>
@@ -104,14 +136,15 @@
   <p id="etat" role="status" aria-live="polite"></p>
   <div id="resultats"></div>
 
-  <p class="petit">Positions : adsb.lol (ou OpenSky) · Routes et modèles : adsbdb.com.<br>Les heures d’arrivée sont des estimations.</p>
+  <p class="petit">Positions : adsb.lol (ou OpenSky) · Routes et modèles : adsbdb.com.<br>Photos : planespotters / Wikipédia.<br>Les heures d’arrivée sont des estimations.<br><button type="button" class="lien" id="r-ouvrir">Modifier les réglages</button></p>
 </main>
 
 <script>
 (function () {
   // ---- Réglages : ta maison ----
-  var MAISON = { lat: 59.4008, lon: 17.9344 };   // Kista (59°24′3″ N, 17°56′4″ E)
-  var CAP_FENETRE = 229;                         // direction de la fenêtre (sud-ouest)
+  var MAISON = null;          // saisi au premier lancement, gardé uniquement sur ce téléphone
+  var CAP_FENETRE = 0;
+  var CLE = "avions-reglages";
   var DEMI_ANGLE = 90;                           // largeur de vue : ±90° (tout ce qui est devant la fenêtre)
   var PORTEE_KM = 30;                            // distance max
   var FUSEAU = "Europe/Stockholm";
@@ -152,7 +185,7 @@
   var elPoints = document.getElementById("points");
 
   // Dessine la zone de la fenêtre sur le radar
-  (function dessinerCone() {
+  function dessinerCone() {
     var R = 150;
     function pt(angle) {
       var a = rad(angle - 90);
@@ -160,7 +193,59 @@
     }
     document.getElementById("cone").setAttribute("d",
       "M0,0 L" + pt(CAP_FENETRE - DEMI_ANGLE) + " A" + R + "," + R + " 0 0 1 " + pt(CAP_FENETRE + DEMI_ANGLE) + " Z");
-  })();
+  }
+
+  // ---- Réglages enregistrés sur le téléphone ----
+  var elReg = document.getElementById("reglages");
+  var champLat = document.getElementById("r-lat"), champLon = document.getElementById("r-lon"), champCap = document.getElementById("r-cap");
+  var msgReg = document.getElementById("r-msg");
+
+  function chargerReglages() {
+    try {
+      var r = JSON.parse(localStorage.getItem(CLE));
+      if (r && isFinite(r.lat) && isFinite(r.lon) && isFinite(r.cap)) {
+        MAISON = { lat: r.lat, lon: r.lon }; CAP_FENETRE = r.cap; return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+  function afficherReglages() {
+    if (MAISON) { champLat.value = MAISON.lat; champLon.value = MAISON.lon; champCap.value = CAP_FENETRE; }
+    msgReg.textContent = "";
+    elReg.hidden = false;
+    champLat.focus();
+  }
+  function lireNombre(champ) { return parseFloat(String(champ.value).replace(",", ".").trim()); }
+  function enregistrerReglages() {
+    var lat = lireNombre(champLat), lon = lireNombre(champLon), c = lireNombre(champCap);
+    if (!(lat >= -90 && lat <= 90) || !(lon >= -180 && lon <= 180) || !(c >= 0 && c <= 360)) {
+      msgReg.textContent = "Vérifie les valeurs : latitude entre -90 et 90, longitude entre -180 et 180, direction entre 0 et 360.";
+      return;
+    }
+    MAISON = { lat: lat, lon: lon }; CAP_FENETRE = c % 360;
+    try { localStorage.setItem(CLE, JSON.stringify({ lat: lat, lon: lon, cap: CAP_FENETRE })); } catch (e) {
+      msgReg.textContent = "Impossible d’enregistrer sur ce téléphone (navigation privée ?). Ça marchera jusqu’à la fermeture de la page.";
+    }
+    dessinerCone();
+    elReg.hidden = true;
+    elEtat.className = "";
+    elEtat.textContent = "Réglages enregistrés. Appuie sur le bouton.";
+  }
+  document.getElementById("r-ok").addEventListener("click", enregistrerReglages);
+  document.getElementById("r-ouvrir").addEventListener("click", afficherReglages);
+  document.getElementById("r-pos").addEventListener("click", function () {
+    if (!navigator.geolocation) { msgReg.textContent = "La localisation n’est pas disponible ici."; return; }
+    msgReg.textContent = "Recherche de ta position…";
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      champLat.value = pos.coords.latitude.toFixed(4);
+      champLon.value = pos.coords.longitude.toFixed(4);
+      msgReg.textContent = "Position remplie. Ajoute la direction de ta fenêtre, puis Enregistrer.";
+    }, function () {
+      msgReg.textContent = "Position refusée ou indisponible. Tu peux la saisir à la main.";
+    }, { enableHighAccuracy: true, timeout: 15000 });
+  });
+
+  if (chargerReglages()) { dessinerCone(); } else { afficherReglages(); }
 
   function dessinerPoints(avions) {
     var svg = "";
@@ -184,7 +269,7 @@
     return chercherAvionsAdsbLol().catch(function (e1) {
       return chercherAvionsOpenSky().catch(function (e2) {
         throw new Error("adsb.lol : " + e1.message + " / OpenSky : " + e2.message +
-                        " / relais : " + (RELAIS || "aucun") + " / version 3");
+                        " / relais : " + (RELAIS || "aucun") + " / version 4");
       });
     });
   }
@@ -250,8 +335,32 @@
     return Promise.all([routeP, avionP]).then(function (res) {
       a.route = res[0] && res[0].response && res[0].response.flightroute || null;
       a.modele = res[1] && res[1].response && res[1].response.aircraft || null;
-      return a;
+      a.photo = null; a.credit = "";
+      if (a.modele && a.modele.url_photo) {
+        a.photo = String(a.modele.url_photo).replace(/^http:/, "https:");
+        a.credit = "Photo de cet avion · planespotters.net";
+        return a;
+      }
+      var nom = a.modele ? [a.modele.manufacturer, a.modele.type].filter(Boolean).join(" ") : "";
+      if (!nom) return a;
+      return photoWikipedia(nom).then(function (url) {
+        if (url) { a.photo = url; a.credit = "Image du modèle · Wikipédia"; }
+        return a;
+      });
     });
+  }
+
+  // Image du modèle (pas de l'avion exact) via Wikipédia
+  function photoWikipedia(nom) {
+    var url = "https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*&generator=search" +
+              "&gsrlimit=1&gsrsearch=" + encodeURIComponent(nom + " aircraft") +
+              "&prop=pageimages&piprop=thumbnail&pithumbsize=700";
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      var pages = d && d.query && d.query.pages;
+      if (!pages) return null;
+      var k = Object.keys(pages)[0];
+      return pages[k] && pages[k].thumbnail ? pages[k].thumbnail.source : null;
+    }).catch(function () { return null; });
   }
 
   function positionDansLeCiel(a) {
@@ -293,6 +402,10 @@
     var compagnie = r && r.airline ? r.airline.name : "";
     var est = estimations(a);
     var h = '<article class="avion' + (principal ? ' principal' : '') + '">';
+    if (a.photo) {
+      h += '<img class="photo" src="' + echapper(a.photo) + '" alt="Photo de l’avion" referrerpolicy="no-referrer" loading="lazy" onerror="this.nextSibling.remove();this.remove()">';
+      h += '<p class="credit">' + echapper(a.credit) + "</p>";
+    }
     h += "<h2>" + echapper(titre) + "</h2>";
     h += '<p class="compagnie">' + echapper(compagnie || (a.appel ? "Compagnie inconnue" : "Vol non identifié")) +
          (m ? " · " + echapper([m.manufacturer, m.type].filter(Boolean).join(" ")) : (a.type ? " · " + echapper(a.type) : "")) + "</p>";
@@ -322,6 +435,7 @@
   }
 
   function lancer() {
+    if (!MAISON) { afficherReglages(); return; }
     bouton.disabled = true;
     elEtat.className = "";
     elEtat.textContent = "Je regarde le ciel…";
