@@ -115,6 +115,8 @@
   var DEMI_ANGLE = 90;                           // largeur de vue : ±90° (tout ce qui est devant la fenêtre)
   var PORTEE_KM = 30;                            // distance max
   var FUSEAU = "Europe/Stockholm";
+  var RELAIS = "https://avions.quentinmonot.workers.dev";   // adresse du relais Cloudflare, ex. "https://avions.tonnom.workers.dev"
+  function via(url) { return RELAIS ? RELAIS.replace(/\/$/, "") + "/?u=" + encodeURIComponent(url) : url; }
 
   var RAYON_TERRE = 6371;
   function rad(d) { return d * Math.PI / 180; }
@@ -190,7 +192,7 @@
   function chercherAvionsAdsbLol() {
     var rayonNm = Math.ceil(PORTEE_KM / 1.852);
     var url = "https://api.adsb.lol/v2/point/" + MAISON.lat + "/" + MAISON.lon + "/" + rayonNm;
-    return fetch(url).then(function (r) {
+    return fetch(via(url)).then(function (r) {
       if (!r.ok) throw new Error("adsb.lol a répondu " + r.status);
       return r.json();
     }).then(function (data) {
@@ -218,7 +220,7 @@
     var b = boite();
     var url = "https://opensky-network.org/api/states/all?lamin=" + b.lamin.toFixed(3) +
               "&lomin=" + b.lomin.toFixed(3) + "&lamax=" + b.lamax.toFixed(3) + "&lomax=" + b.lomax.toFixed(3);
-    return fetch(url).then(function (r) {
+    return fetch(via(url)).then(function (r) {
       if (!r.ok) throw new Error("OpenSky a répondu " + r.status);
       return r.json();
     }).then(function (data) {
@@ -241,9 +243,9 @@
   }
 
   function infosRoute(a) {
-    var routeP = a.appel ? fetch("https://api.adsbdb.com/v0/callsign/" + encodeURIComponent(a.appel))
+    var routeP = a.appel ? fetch(via("https://api.adsbdb.com/v0/callsign/" + encodeURIComponent(a.appel)))
       .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }) : Promise.resolve(null);
-    var avionP = fetch("https://api.adsbdb.com/v0/aircraft/" + encodeURIComponent(a.hex))
+    var avionP = fetch(via("https://api.adsbdb.com/v0/aircraft/" + encodeURIComponent(a.hex)))
       .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
     return Promise.all([routeP, avionP]).then(function (res) {
       a.route = res[0] && res[0].response && res[0].response.flightroute || null;
