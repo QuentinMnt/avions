@@ -184,7 +184,7 @@
     return chercherAvionsAdsbLol().catch(function (e1) {
       return chercherAvionsOpenSky().catch(function (e2) {
         throw new Error("adsb.lol : " + e1.message + " / OpenSky : " + e2.message +
-                        " / page ouverte depuis : " + (location.protocol || "?"));
+                        " / relais : " + (RELAIS || "aucun") + " / version 3");
       });
     });
   }
